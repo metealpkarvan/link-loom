@@ -68,3 +68,8 @@ Possible next steps: Netscape bookmark import and an undo action. See [CONTRIBUT
 **Türkçe:** Mesajlara ve notlara dağılmış bağlantıları temizleyen, düzenleyen ve dışa aktaran küçük bir araç. Veriler tarayıcıda saklanır; hesap açmak gerekmez.
 
 MIT © Mete Alp Karvan
+
+
+## Mac architecture support
+
+The browser app supports both Intel and Apple Silicon Macs through a modern browser. No Rosetta or processor-specific app package is needed. CI runs the rule tests with native Node.js on x86_64 and arm64 macOS runners; browser/device coverage is separate from these checks. The downloaded ZIP contains the same architecture-independent HTML, CSS and JavaScript as the live app.
