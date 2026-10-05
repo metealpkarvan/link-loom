@@ -1,0 +1,13 @@
+{
+  "name": "link-loom",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Turn scattered links into a tidy, private collection.",
+  "scripts": {
+    "test": "node --test --experimental-test-coverage",
+    "start": "python3 -m http.server 8080 --bind 127.0.0.1"
+  },
+  "engines": { "node": ">=22" },
+  "license": "MIT"
+}

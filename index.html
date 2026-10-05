@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A private place for good links. Clean, organize, search, and export bookmarks in your browser.">
+  <meta name="theme-color" content="#1b5044">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; base-uri 'self'; form-action 'none'">
+  <title>Link Loom — A little order for your links</title>
+  <link rel="icon" href="./assets/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./src/app.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="Link Loom home"><img src="./assets/icon.svg" alt="" width="36" height="36">Link Loom<span class="version">01</span></a>
+    <span class="local-badge" id="storage-status"><span class="status-dot"></span>Saved on this device</span>
+  </header>
+  <main>
+    <section class="intro" aria-labelledby="heading">
+      <div class="intro-copy"><p class="eyebrow">A LITTLE ORDER FOR YOUR INTERNET</p><h1 id="heading">Good links.<br><span>Less clutter.</span></h1><p class="intro-text">Gather the tabs, messages, and bookmarks worth keeping.<br class="desktop-break"> Make one calm collection. Take it anywhere.</p></div>
+      <div class="intro-note"><span class="note-mark" aria-hidden="true">↗</span><p>No accounts.<br>No tracking.<br><strong>Just your links.</strong></p></div>
+    </section>
+    <section class="workspace" aria-label="Link organizer">
+      <aside class="capture-panel">
+        <div class="panel-title"><span class="step">01</span><h2>Gather your links</h2></div>
+        <p class="muted">Paste a list, a messy message, or a single URL.</p>
+        <form id="capture-form">
+          <label for="paste-input" class="sr-only">Links to add</label>
+          <textarea id="paste-input" rows="7" maxlength="100000" placeholder="https://a-good-idea.com&#10;https://another-one.dev&#10;&#10;Messy messages work, too."></textarea>
+          <label for="collection-input" class="field-label">Collection <span>optional</span></label>
+          <input id="collection-input" maxlength="40" placeholder="e.g. Weekend reading" autocomplete="off">
+          <label class="check-label"><input type="checkbox" id="clean-toggle" checked><span>Remove common tracking parameters</span></label>
+          <p class="tiny">Cleans utm_*, fbclid, gclid, and a few others. Other parameters and anchors stay intact.</p>
+          <button class="primary full" type="submit">Add to my collection <span aria-hidden="true">↗</span></button>
+        </form>
+        <div class="capture-footer"><span>Need a starting point?</span><button class="text-button" id="sample-button" type="button">Try a few sample links</button></div>
+        <div class="privacy-note"><span aria-hidden="true">◇</span><p>Your collection stays in this browser. Export a backup before changing devices.</p></div>
+      </aside>
+      <section class="collection-panel" aria-labelledby="collection-heading">
+        <div class="collection-header"><div class="panel-title"><span class="step">02</span><h2 id="collection-heading">Your collection</h2><span id="link-count" class="count">0</span></div><div class="tools"><button id="import-button" type="button" class="secondary">Import backup</button><input type="file" id="import-input" accept=".json,application/json" hidden><label for="export-format" class="sr-only">Export format</label><select id="export-format"><option value="markdown">Markdown</option><option value="html">Browser bookmarks</option><option value="json">JSON backup</option></select><button id="export-button" type="button" class="secondary">Export ↓</button></div></div>
+        <div class="filters"><div class="search-wrap"><span aria-hidden="true">⌕</span><label for="search-input" class="sr-only">Search links</label><input id="search-input" type="search" placeholder="Find a title, domain, or collection…" autocomplete="off"></div><label for="collection-filter" class="sr-only">Filter by collection</label><select id="collection-filter"><option value="">All collections</option></select><button id="favorite-filter" class="secondary favorite-filter" type="button" aria-pressed="false">☆ Starred</button></div>
+        <p id="results-count" class="results-caption" hidden></p>
+        <ul id="link-list" class="link-list" aria-label="Saved links"></ul>
+        <div id="empty-state" class="empty-state"><div class="empty-icon" aria-hidden="true">↗</div><h3>A place for your next good find.</h3><p>Add your first links on the left.<br>They will be ready when you need them.</p></div>
+        <div id="no-results" class="empty-state" hidden><h3>No links match that.</h3><p>Try another search or clear your filters.</p><button id="reset-filters" type="button" class="secondary">Clear filters</button></div>
+        <div class="collection-footnote"><span id="collection-summary">Ready for your first link.</span><span>YOURS TO KEEP. YOURS TO TAKE.</span></div>
+      </section>
+    </section>
+    <p id="message" class="message" role="status" aria-live="polite"></p>
+  </main>
+  <footer><p>Made for the links that deserve a second look.</p><a href="https://github.com/metealpkarvan/link-loom" target="_blank" rel="noopener noreferrer">Open source on GitHub ↗</a></footer>
+  <dialog id="edit-dialog"><form id="edit-form"><h2>Edit link</h2><label class="field-label" for="edit-title">Title</label><input id="edit-title" required maxlength="200"><label class="field-label" for="edit-collection">Collection</label><input id="edit-collection" maxlength="40"><div class="dialog-actions"><button id="cancel-edit" type="button" class="secondary">Cancel</button><button type="submit" class="primary">Save changes</button></div></form></dialog>
+</body>
+</html>
