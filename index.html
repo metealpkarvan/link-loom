@@ -13,13 +13,17 @@
 </head>
 <body>
   <header class="site-header">
-    <a class="brand" href="./" aria-label="Link Loom home"><img src="./assets/icon.svg" alt="" width="36" height="36">Link Loom<span class="version">01</span></a>
+    <a class="brand" href="./" aria-label="Link Loom home"><img src="./assets/icon.svg" alt="" width="36" height="36">Link Loom<span class="version">1.1</span></a>
     <span class="local-badge" id="storage-status"><span class="status-dot"></span>Saved on this device</span>
   </header>
   <main>
     <section class="intro" aria-labelledby="heading">
       <div class="intro-copy"><p class="eyebrow">A LITTLE ORDER FOR YOUR INTERNET</p><h1 id="heading">Good links.<br><span>Less clutter.</span></h1><p class="intro-text">Gather the tabs, messages, and bookmarks worth keeping.<br class="desktop-break"> Make one calm collection. Take it anywhere.</p></div>
       <div class="intro-note"><span class="note-mark" aria-hidden="true">↗</span><p>No accounts.<br>No tracking.<br><strong>Just your links.</strong></p></div>
+    </section>
+    <section id="storage-warning" class="storage-warning" aria-labelledby="storage-warning-title" hidden>
+      <div><h2 id="storage-warning-title">Your saved data is protected.</h2><p id="storage-warning-text"></p></div>
+      <div class="recovery-actions"><button id="download-original" class="secondary" type="button">Download original</button><button id="retry-storage" class="secondary" type="button">Retry saved data</button></div>
     </section>
     <section class="workspace" aria-label="Link organizer">
       <aside class="capture-panel">
@@ -32,7 +36,7 @@
           <input id="collection-input" maxlength="40" placeholder="e.g. Weekend reading" autocomplete="off">
           <label class="check-label"><input type="checkbox" id="clean-toggle" checked><span>Remove common tracking parameters</span></label>
           <p class="tiny">Cleans utm_*, fbclid, gclid, and a few others. Other parameters and anchors stay intact.</p>
-          <button class="primary full" type="submit">Add to my collection <span aria-hidden="true">↗</span></button>
+          <button id="add-button" class="primary full" type="submit">Add to my collection <span aria-hidden="true">↗</span></button>
         </form>
         <div class="capture-footer"><span>Need a starting point?</span><button class="text-button" id="sample-button" type="button">Try a few sample links</button></div>
         <div class="privacy-note"><span aria-hidden="true">◇</span><p>Your collection stays in this browser. Export a backup before changing devices.</p></div>
@@ -50,6 +54,6 @@
     <p id="message" class="message" role="status" aria-live="polite"></p>
   </main>
   <footer><p>Made for the links that deserve a second look.</p><a href="https://github.com/metealpkarvan/link-loom" target="_blank" rel="noopener noreferrer">Open source on GitHub ↗</a></footer>
-  <dialog id="edit-dialog"><form id="edit-form"><h2>Edit link</h2><label class="field-label" for="edit-title">Title</label><input id="edit-title" required maxlength="200"><label class="field-label" for="edit-collection">Collection</label><input id="edit-collection" maxlength="40"><div class="dialog-actions"><button id="cancel-edit" type="button" class="secondary">Cancel</button><button type="submit" class="primary">Save changes</button></div></form></dialog>
+  <dialog id="edit-dialog"><form id="edit-form"><h2>Edit link</h2><label class="field-label" for="edit-title">Title</label><input id="edit-title" required maxlength="200"><label class="field-label" for="edit-collection">Collection</label><input id="edit-collection" maxlength="40"><p id="edit-message" class="message" role="status" aria-live="polite"></p><div class="dialog-actions"><button id="cancel-edit" type="button" class="secondary">Cancel</button><button id="save-edit" type="submit" class="primary">Save changes</button></div></form></dialog>
 </body>
 </html>

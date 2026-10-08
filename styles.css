@@ -22,6 +22,11 @@ h1 span { color: #6a805d; }
 .note-mark { font-family: Georgia, serif; font-size: 92px; color: #b6cba4; font-weight: 400; }
 .intro-note p { font-size: 14px; line-height: 1.8; color: var(--muted); }
 .intro-note strong { color: var(--green); font-weight: 500; }
+.storage-warning { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 20px 24px; margin-bottom: 20px; border: 1px solid #cfb980; border-radius: 12px; background: #faf3df; }
+.storage-warning > div:first-child { flex: 1 1 280px; }
+.storage-warning h2 { font-size: 15px; }
+.storage-warning p { margin: 8px 0 0; line-height: 1.7; font-size: 12px; }
+.recovery-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .workspace { display: grid; grid-template-columns: 320px minmax(0, 1fr); border: 1px solid var(--line); border-radius: 16px; background: var(--white); overflow: hidden; min-height: 565px; box-shadow: 0 12px 35px #203d2a04; }
 .capture-panel { padding: 28px 24px; background: #ecf0e7; border-right: 1px solid var(--line); }
 .panel-title { display: flex; align-items: center; gap: 10px; }

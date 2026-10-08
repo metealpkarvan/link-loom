@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MAX_LINKS, addLinks, defaultTitle, escapeHtml, exportLinks, filterLinks, mergeBackup, normalizeUrl, parseLinks, readBackup } from '../src/links.js';
+import { MAX_BACKUP_BYTES, MAX_LINKS, addLinks, defaultTitle, escapeHtml, exportLinks, filterLinks, mergeBackup, normalizeUrl, parseLinks, readBackup, serializeBackup } from '../src/links.js';
 
 const link = (url = 'https://example.com/', extra = {}) => ({ url, title: 'Example', collection: 'Reading', starred: false, addedAt: '2026-01-01T12:00:00Z', ...extra });
 
@@ -99,3 +99,54 @@ test('Markdown export escapes labels and protects parentheses in URLs', () => {
 test('uncollected links have a readable export heading', () => assert.match(exportLinks([link(undefined, { collection: '' })], 'markdown').text, /## Unsorted/));
 test('unknown export formats fail', () => assert.throws(() => exportLinks([], 'xml')));
 test('all five HTML-sensitive characters are escaped', () => assert.equal(escapeHtml('&<>"\''), '&amp;&lt;&gt;&quot;&#39;'));
+
+function collectionAtBytes(bytes) {
+  const entry = link('https://example.com/?q=', { title: 'Çay ★' });
+  const baseBytes = new TextEncoder().encode(serializeBackup([entry])).byteLength;
+  entry.url += 'x'.repeat(bytes - baseBytes);
+  return [entry];
+}
+
+test('canonical JSON is the export format and round-trips at the UTF-8 byte limit', () => {
+  const original = collectionAtBytes(MAX_BACKUP_BYTES);
+  const text = serializeBackup(original);
+  assert.equal(new TextEncoder().encode(text).byteLength, MAX_BACKUP_BYTES);
+  assert.ok(text.length < MAX_BACKUP_BYTES);
+  assert.equal(exportLinks(original, 'json').text, text);
+  assert.deepEqual(readBackup(text), original);
+});
+test('rejects JSON one byte above the shared limit', () => {
+  const text = serializeBackup(collectionAtBytes(MAX_BACKUP_BYTES));
+  assert.throws(() => readBackup(text + ' '), /UTF-8/);
+  assert.throws(() => serializeBackup(collectionAtBytes(MAX_BACKUP_BYTES + 1)), /UTF-8/);
+});
+test('raw backup byte limits include Unicode and unrecognized fields', () => {
+  const text = JSON.stringify({ version: 1, links: [link()], padding: 'ç'.repeat(1_000_000) });
+  assert.ok(text.length < MAX_BACKUP_BYTES);
+  assert.throws(() => readBackup(text), /UTF-8/);
+});
+test('compact saves must fit their canonical portable backup before being accepted', () => {
+  const original = collectionAtBytes(MAX_BACKUP_BYTES + 1);
+  const compact = JSON.stringify({ version: 1, links: original });
+  assert.ok(new TextEncoder().encode(compact).byteLength < MAX_BACKUP_BYTES);
+  assert.throws(() => readBackup(compact), /UTF-8/);
+});
+test('oversized pasted additions fail without modifying the previous collection', () => {
+  const original = [link()];
+  assert.throws(() => addLinks(original, ['https://new.example/?q=' + 'x'.repeat(MAX_BACKUP_BYTES)]), /UTF-8/);
+  assert.deepEqual(original, [link()]);
+});
+test('merging individually valid backups rejects an oversized combined collection', () => {
+  const original = [link('https://first.example/?q=' + 'x'.repeat(1_000_000))];
+  const incoming = [link('https://second.example/?q=' + 'x'.repeat(1_000_000))];
+  assert.deepEqual(readBackup(serializeBackup(original)), original);
+  assert.deepEqual(readBackup(serializeBackup(incoming)), incoming);
+  assert.throws(() => mergeBackup(original, incoming), /UTF-8/);
+  assert.equal(original.length, 1);
+});
+test('canonical serialization validates and reconstructs link fields', () => {
+  const entry = link('https://EXAMPLE.com/', { title: ' Example ', unexpected: 'ignored' });
+  const restored = readBackup(serializeBackup([entry]));
+  assert.deepEqual(restored, [link()]);
+  assert.throws(() => serializeBackup([link(undefined, { starred: 'yes' })]), /invalid link/);
+});

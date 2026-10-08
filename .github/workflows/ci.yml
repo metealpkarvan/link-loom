@@ -17,6 +17,7 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
       - run: npm test
+      - run: python3 scripts/package.py
 
   macos:
     strategy:
@@ -38,3 +39,4 @@ jobs:
           EXPECTED_ARCH: ${{ matrix.arch }}
         run: node -e "console.log(process.platform, process.arch); if (process.arch !== process.env.EXPECTED_ARCH) process.exit(1)"
       - run: npm test
+      - run: python3 scripts/package.py

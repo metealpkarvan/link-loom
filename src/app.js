@@ -1,39 +1,68 @@
-import { addLinks, exportLinks, filterLinks, mergeBackup, parseLinks, readBackup } from './links.js';
+import { addLinks, exportLinks, filterLinks, MAX_BACKUP_BYTES, mergeBackup, parseLinks, readBackup, serializeBackup } from './links.js';
+import { createCollectionStore } from './storage.js';
 
 const $ = id => document.getElementById(id);
 const STORAGE_KEY = 'link-loom:v1';
 let links = [];
 let starredOnly = false;
 let editingUrl = null;
-let storageAvailable = true;
+let editingSnapshot = null;
+let sessionDirty = false;
+let storage;
+try { storage = window.localStorage; }
+catch { storage = { getItem() { throw new Error('Storage access is unavailable.'); } }; }
+const store = createCollectionStore(storage, STORAGE_KEY);
+links = store.load().links;
 
-function notify(text) { $('message').textContent = text; }
-
-try {
-  const saved = localStorage.getItem(STORAGE_KEY);
-  if (saved) links = readBackup(saved);
-} catch {
-  storageAvailable = false;
-  $('storage-status').textContent = 'Session only — export to keep';
-  notify('Saved data could not be read. This session will not overwrite it. Export a JSON backup before leaving.');
+function notify(text) {
+  $('message').textContent = text;
+  if ($('edit-dialog').open) $('edit-message').textContent = store.state.mode === 'protected'
+    ? text + ' Saving is paused; your draft is kept. Cancel to download the original or restore a valid backup.'
+    : text;
 }
 
-function commit(next) {
-  if (storageAvailable) {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, links: next })); }
-    catch { throw new Error('Browser storage is full or unavailable. Export your current collection; this change was not saved.'); }
+function updateStorageStatus() {
+  const { mode, raw } = store.state;
+  const protectedData = mode === 'protected';
+  $('storage-status').textContent = protectedData ? 'Saved data protected' : mode === 'unavailable' ? 'Session only — export to keep' : 'Saved in this browser';
+  $('storage-warning').hidden = mode === 'ready';
+  $('storage-warning-title').textContent = protectedData ? 'Your saved data is protected.' : 'This collection is session only.';
+  $('storage-warning-text').textContent = protectedData
+    ? 'The stored collection could not be read. Changes are paused; your last readable links are kept. Download the original or import a valid JSON backup to recover.'
+    : 'Browser storage is unavailable. Export your collection before closing this page, or retry reading saved data.';
+  $('download-original').hidden = typeof raw !== 'string';
+  $('add-button').disabled = protectedData;
+  $('save-edit').disabled = protectedData;
+  if (protectedData && $('edit-dialog').open) $('edit-message').textContent = 'Saving is paused to protect unreadable data. Your draft is kept. Cancel to download the original or restore a valid backup.';
+}
+
+function commit(next, options) {
+  try {
+    if (store.state.mode === 'unavailable') {
+      links = readBackup(serializeBackup(next));
+      sessionDirty = true;
+    } else {
+      links = store.save(next, options).links;
+      sessionDirty = false;
+    }
+  } catch (error) {
+    if (error.code === 'changed' && store.state.mode === 'ready') links = store.state.links;
+    updateStorageStatus();
+    render();
+    throw error;
   }
-  links = next;
+  updateStorageStatus();
   render();
 }
 
-function iconButton(label, glyph, onClick, pressed) {
+function iconButton(label, glyph, onClick, pressed, mutates = false) {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'icon-button';
   button.textContent = glyph;
   button.setAttribute('aria-label', label);
   button.title = label;
+  button.disabled = mutates && store.state.mode === 'protected';
   if (pressed !== undefined) button.setAttribute('aria-pressed', String(pressed));
   button.addEventListener('click', () => {
     try { onClick(); } catch (error) { notify(error.message); }
@@ -84,14 +113,16 @@ function render() {
       iconButton(`${link.starred ? 'Unstar' : 'Star'} ${link.title}`, link.starred ? '★' : '☆', () => {
         commit(links.map(entry => entry.url === link.url ? { ...entry, starred: !entry.starred } : entry));
         notify(link.starred ? 'Star removed.' : 'Link starred.');
-      }, link.starred),
+      }, link.starred, true),
       iconButton(`Edit ${link.title}`, '✎', () => {
         editingUrl = link.url;
+        editingSnapshot = JSON.stringify(link);
         $('edit-title').value = link.title;
         $('edit-collection').value = link.collection;
+        $('edit-message').textContent = '';
         $('edit-dialog').showModal();
         $('edit-title').focus();
-      }),
+      }, undefined, true),
       iconButton(`Copy ${link.title}`, '⧉', async () => {
         try { await navigator.clipboard.writeText(link.url); notify('Clean link copied.'); }
         catch { notify('Clipboard is unavailable. Open the link and copy its address, or use Export.'); }
@@ -99,7 +130,7 @@ function render() {
       iconButton(`Remove ${link.title}`, '×', () => {
         commit(links.filter(entry => entry.url !== link.url));
         notify('Link removed.');
-      })
+      }, undefined, true)
     );
     item.append(tile, content, actions);
     $('link-list').append(item);
@@ -149,33 +180,71 @@ $('edit-form').addEventListener('submit', event => {
   const title = $('edit-title').value.trim();
   if (!title) { notify('A title cannot be empty.'); return; }
   try {
+    const current = links.find(link => link.url === editingUrl);
+    if (!current || JSON.stringify(current) !== editingSnapshot) {
+      throw new Error('This link changed elsewhere. Your draft is kept; copy it and reopen the editor before updating.');
+    }
     commit(links.map(link => link.url === editingUrl ? { ...link, title, collection: $('edit-collection').value.trim() } : link));
     $('edit-dialog').close();
     notify('Link updated.');
   } catch (error) { notify(error.message); }
 });
 $('cancel-edit').addEventListener('click', () => $('edit-dialog').close());
-$('export-button').addEventListener('click', () => {
-  const exported = exportLinks(links, $('export-format').value);
-  const url = URL.createObjectURL(new Blob([exported.text], { type: `${exported.type};charset=utf-8` }));
+function download(text, type, filename) {
+  const url = URL.createObjectURL(new Blob([text], { type: `${type};charset=utf-8` }));
   const anchor = document.createElement('a');
   anchor.href = url;
-  anchor.download = `link-loom.${exported.extension}`;
+  anchor.download = filename;
   document.body.append(anchor);
   anchor.click();
   anchor.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
-  notify(`Exported all ${links.length} links. Choose JSON backup to re-import them later.`);
+}
+$('export-button').addEventListener('click', () => {
+  try {
+    const exported = exportLinks(links, $('export-format').value);
+    download(exported.text, exported.type, `link-loom.${exported.extension}`);
+    notify(`Exported all ${links.length} links. Choose JSON backup to re-import them later.`);
+  } catch (error) { notify(error.message); }
+});
+$('download-original').addEventListener('click', () => {
+  const { raw } = store.state;
+  if (typeof raw !== 'string') return;
+  download(raw, 'text/plain', 'link-loom-recovery.txt');
+  notify('Original stored text downloaded. Keep this recovery copy; it may need repair before import.');
+});
+$('retry-storage').addEventListener('click', () => {
+  if (sessionDirty && !window.confirm('Reload saved data? Session-only changes will be replaced. Export them first if you want to keep them.')) return;
+  const next = store.load();
+  if (next.mode === 'ready') { links = next.links; sessionDirty = false; }
+  updateStorageStatus();
+  render();
+  notify(next.mode === 'ready' ? 'Saved collection loaded.' : next.mode === 'protected' ? 'Saved data is still unreadable. The original is protected.' : 'Storage is still unavailable. Export before closing this page.');
 });
 $('import-button').addEventListener('click', () => $('import-input').click());
 $('import-input').addEventListener('change', async event => {
   const file = event.target.files[0];
   if (!file) return;
+  const protectedRaw = store.state.mode === 'protected' ? store.state.raw : undefined;
   try {
-    if (file.size > 2_000_000) throw new Error('Backup is too large (maximum 2 MB).');
+    if (file.size > MAX_BACKUP_BYTES) throw new Error('Backup is too large (maximum 2 MB in UTF-8).');
     const imported = readBackup(await file.text());
     const result = mergeBackup(links, imported);
-    commit(result.links);
+    if (protectedRaw !== undefined) {
+      if (store.state.raw !== protectedRaw || store.state.mode !== 'protected') throw new Error('Saved data changed while opening the backup. Review it and select the backup again.');
+      if (!window.confirm('Restore this valid backup? It will be merged with your last readable links. The unreadable stored text will be downloaded as a recovery copy before it is replaced.')) {
+        notify('Restore cancelled. Original saved data was kept.');
+        return;
+      }
+      const latest = store.load();
+      if (latest.raw !== protectedRaw || latest.mode !== 'protected') {
+        if (latest.mode === 'ready') links = latest.links;
+        updateStorageStatus(); render();
+        throw new Error('Saved data changed before restoration. Nothing was replaced. Review it and try again.');
+      }
+      download(protectedRaw, 'text/plain', 'link-loom-recovery.txt');
+      commit(result.links, { replaceProtected: true });
+    } else commit(result.links);
     notify(`Imported ${result.added} links. Existing links were kept.`);
   } catch (error) { notify(`Import failed: ${error.message}`); }
   finally { event.target.value = ''; }
@@ -183,11 +252,12 @@ $('import-input').addEventListener('change', async event => {
 
 // A second open tab can update the collection. Never silently overwrite newer data.
 window.addEventListener('storage', event => {
-  if (event.key !== STORAGE_KEY) return;
-  try {
-    links = event.newValue ? readBackup(event.newValue) : [];
-    render();
-    notify('Collection refreshed from another tab.');
-  } catch { notify('Another tab saved unreadable data. Reload before making changes.'); }
+  if ((event.key !== STORAGE_KEY && event.key !== null) || (event.storageArea && event.storageArea !== storage)) return;
+  if (sessionDirty) { notify('Saved data changed in another tab. Export your session collection before retrying saved data.'); return; }
+  const next = store.load(); // Read current content; queued events can contain older text.
+  if (next.mode === 'ready') links = next.links;
+  updateStorageStatus(); render();
+  notify(next.mode === 'ready' ? 'Collection refreshed from another tab.' : next.mode === 'protected' ? 'Another tab saved unreadable data. It is protected; your last readable links are kept.' : 'Storage could not be read. Your collection is kept; export before leaving.');
 });
+updateStorageStatus();
 render();

@@ -1,4 +1,5 @@
 export const MAX_LINKS = 1000;
+export const MAX_BACKUP_BYTES = 2_000_000;
 export const TRACKERS = new Set(['fbclid', 'gclid', 'dclid', 'msclkid', 'mc_cid', 'mc_eid', '_hsenc', '_hsmi']);
 
 export function normalizeUrl(raw, cleanTracking = true) {
@@ -60,6 +61,7 @@ export function addLinks(existing, urls, collection = '', now = new Date().toISO
     result.push({ url, title: defaultTitle(url), collection: collection.trim().slice(0, 40), starred: false, addedAt: now });
     known.add(url);
   }
+  serializeBackup(result);
   return { links: result, added: result.length - existing.length, duplicates };
 }
 
@@ -69,14 +71,18 @@ export function filterLinks(links, { search = '', collection = '', starred = fal
     && `${link.title} ${link.url} ${link.collection}`.toLocaleLowerCase().includes(query));
 }
 
-export function readBackup(text) {
-  if (text.length > 2_000_000) throw new Error('Backup is too large (maximum 2 MB).');
-  const data = JSON.parse(text);
-  if (data?.version !== 1 || !Array.isArray(data.links) || data.links.length > MAX_LINKS) {
+function checkBackupSize(text) {
+  if (new TextEncoder().encode(text).byteLength > MAX_BACKUP_BYTES) {
+    throw new Error('Backup is too large (maximum 2 MB in UTF-8). Nothing was changed.');
+  }
+}
+
+function validateLinks(links) {
+  if (!Array.isArray(links) || links.length > MAX_LINKS) {
     throw new Error('Use a Link Loom JSON backup with version 1.');
   }
   const known = new Set();
-  return data.links.map(link => {
+  return links.map(link => {
     if (!link || typeof link.url !== 'string' || typeof link.title !== 'string'
       || !link.title.trim() || link.title.length > 200 || typeof link.collection !== 'string'
       || link.collection.length > 40 || typeof link.starred !== 'boolean'
@@ -90,11 +96,30 @@ export function readBackup(text) {
   });
 }
 
+export function serializeBackup(links) {
+  const text = JSON.stringify({ version: 1, links: validateLinks(links) }, null, 2) + '\n';
+  checkBackupSize(text);
+  return text;
+}
+
+export function readBackup(text) {
+  checkBackupSize(text);
+  const data = JSON.parse(text);
+  if (data?.version !== 1) throw new Error('Use a Link Loom JSON backup with version 1.');
+  const links = validateLinks(data.links);
+  // Legacy compact saves remain readable when their portable backup also fits.
+  // Every accepted collection must round-trip through the same exported format.
+  serializeBackup(links);
+  return links;
+}
+
 export function mergeBackup(existing, imported) {
   const known = new Set(existing.map(link => link.url));
   const additions = imported.filter(link => !known.has(link.url));
   if (existing.length + additions.length > MAX_LINKS) throw new Error(`Import would exceed the ${MAX_LINKS}-link limit.`);
-  return { links: [...existing, ...additions], added: additions.length };
+  const links = [...existing, ...additions];
+  serializeBackup(links);
+  return { links, added: additions.length };
 }
 
 export function escapeHtml(text) {
@@ -104,7 +129,7 @@ export function escapeHtml(text) {
 function escapeMarkdown(text) { return text.replace(/([\\`*_{}\[\]<>#+.!|()])/g, '\\$1'); }
 
 export function exportLinks(links, format) {
-  if (format === 'json') return { text: JSON.stringify({ version: 1, links }, null, 2) + '\n', type: 'application/json', extension: 'json' };
+  if (format === 'json') return { text: serializeBackup(links), type: 'application/json', extension: 'json' };
   const groups = new Map();
   for (const link of links) {
     const name = link.collection || 'Unsorted';
